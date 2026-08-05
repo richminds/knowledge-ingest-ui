@@ -18,8 +18,13 @@ export const KnowledgeApi = {
   jobStatus: (jobId: string) =>
     api.get<JobStatusResponse>(`/v1/ingest/${jobId}`).then((r) => r.data),
 
-  files: (limit = 100) =>
-    api.get<FilesListResponse>("/v1/files", { params: { limit } }).then((r) => r.data),
+  // orgId scopes the list to that org's files (plus unscoped ones); omit to
+  // see only unscoped files — same fail-closed default as query-time chunk
+  // filtering (see useKnowledgeFiles, which passes the signed-in user's org).
+  files: (limit = 100, orgId?: string) =>
+    api
+      .get<FilesListResponse>("/v1/files", { params: { limit, org_id: orgId } })
+      .then((r) => r.data),
 
   // userId/orgId tag every resulting chunk's metadata (uploaded_by/org_id) —
   // org_id is what query() below uses as a hard tenant-isolation filter, so

@@ -24,11 +24,15 @@ export function useKnowledgeUpload() {
 }
 
 // Files durably persisted in MongoDB GridFS — proves ingestion survives
-// restarts. Same policy as useKnowledgeStats: manual "Refresh" only.
+// restarts. Same policy as useKnowledgeStats: manual "Refresh" only. Scoped
+// to the signed-in user's own org_id (plus unscoped files) — org_id is part
+// of the query key so switching accounts never shows a stale cached list
+// from a different org.
 export function useKnowledgeFiles() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["knowledge", "files"],
-    queryFn: () => KnowledgeApi.files(),
+    queryKey: ["knowledge", "files", user?.org_id ?? null],
+    queryFn: () => KnowledgeApi.files(100, user?.org_id ?? undefined),
     refetchInterval: false,
   });
 }
