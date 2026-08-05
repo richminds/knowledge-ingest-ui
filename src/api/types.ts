@@ -69,11 +69,14 @@ export interface RagCitationValidation {
   available_citations: number[];
 }
 
-// response.evaluation_metrics shape — see rag/evaluation.py.
+// response.evaluation_metrics shape — see rag/evaluation.py::evaluate_answer.
 export interface RagEvaluationMetrics {
   faithfulness: number;
-  context_precision: number;
+  precision: number;
+  recall: number;
   answer_relevance: number;
+  confidence_score: number;
+  confidence_level: "high" | "medium" | "low";
   evaluator: string;
   advanced_notes: string;
 }

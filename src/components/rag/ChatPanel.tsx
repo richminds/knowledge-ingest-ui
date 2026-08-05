@@ -231,8 +231,13 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
         {message.metrics && (
           <div className="flex flex-wrap gap-1.5">
+            <ConfidenceBadge
+              level={message.metrics.confidence_level}
+              score={message.metrics.confidence_score}
+            />
             <MetricBadge label="Faithfulness" value={message.metrics.faithfulness} />
-            <MetricBadge label="Context precision" value={message.metrics.context_precision} />
+            <MetricBadge label="Precision" value={message.metrics.precision} />
+            <MetricBadge label="Recall" value={message.metrics.recall} />
             <MetricBadge label="Relevance" value={message.metrics.answer_relevance} />
           </div>
         )}
@@ -253,6 +258,26 @@ function MetricBadge({ label, value }: { label: string; value: number }) {
   return (
     <Badge variant="outline" className={cn("text-[9px] font-normal gap-1", color)}>
       {label} {value.toFixed(2)}
+    </Badge>
+  );
+}
+
+function ConfidenceBadge({
+  level,
+  score,
+}: {
+  level: "high" | "medium" | "low";
+  score: number;
+}) {
+  const color =
+    level === "high"
+      ? "text-[#2ec28a] border-[#2ec28a]/30"
+      : level === "medium"
+      ? "text-[#f5a623] border-[#f5a623]/30"
+      : "text-[#ff5d6c] border-[#ff5d6c]/30";
+  return (
+    <Badge variant="outline" className={cn("text-[9px] font-semibold gap-1 capitalize", color)}>
+      {level} confidence · {score.toFixed(2)}
     </Badge>
   );
 }
