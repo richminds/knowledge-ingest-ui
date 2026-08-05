@@ -4,6 +4,11 @@
 // API keys), so it authenticates the human into this UI only. Requests to
 // knowledge-service still go out under VITE_API_KEY (see api/client.ts).
 
+// Mirrors auth-service's features/organization.py::GUEST_ORG_ID — the shared
+// organization every signup lands on by default (see AuthScreen.tsx). Kept as
+// one constant so the literal string isn't duplicated across components.
+export const GUEST_ORG_ID = "Guest";
+
 export interface AuthUser {
   user_id: string;
   email: string;

@@ -5,10 +5,11 @@ import { useAuth } from "@/lib/auth";
 import { authErrorMessage } from "@/api/authClient";
 import { Button } from "@/components/ui/button";
 
-// Shown when the signed-in user has no org_id yet (signed up without one —
-// see auth-service's register(): omitting org_id creates a guest account).
-// Lets them attach to an organization after the fact via the self-service
-// join endpoint (POST /auth/me/organization) instead of needing a staff admin.
+// Shown while the signed-in user is still on the shared Guest organization
+// (auth-service's register() default when no org_id is given — see
+// GUEST_ORG_ID) or, for an older account, has no org_id at all. Lets them
+// move to a real organization via the self-service join endpoint
+// (POST /auth/me/organization) instead of needing a staff admin.
 export function GuestBanner() {
   const { joinOrganization } = useAuth();
   const [orgId, setOrgId] = useState("");
@@ -33,8 +34,8 @@ export function GuestBanner() {
     <div className="flex flex-wrap items-center gap-2.5 px-4 py-2.5 rounded-xl border border-[#f5a623]/30 bg-[#f5a623]/10 text-xs">
       <UserRoundCog className="w-4 h-4 text-[#f5a623] shrink-0" />
       <span className="text-muted-foreground">
-        You're signed in as a <span className="font-semibold text-foreground">guest</span> — no
-        organization yet.
+        You're on the shared <span className="font-semibold text-foreground">Guest</span>{" "}
+        organization — join a specific one below.
       </span>
       <div className="flex items-center gap-1.5 ml-auto">
         <input

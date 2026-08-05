@@ -6,6 +6,7 @@ import { GuestBanner } from "@/components/GuestBanner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
+import { GUEST_ORG_ID } from "@/api/authTypes";
 
 const THEME_KEY = "knowledge-ingest-theme";
 
@@ -54,7 +55,10 @@ export default function App() {
               <span className="text-xs font-medium leading-tight">{user.name}</span>
               <span className="text-[10px] text-muted-foreground leading-tight">{user.email}</span>
             </div>
-            <Badge variant={user.org_id ? "outline" : "warning"} className="text-[10px] font-mono">
+            <Badge
+              variant={user.org_id === GUEST_ORG_ID ? "warning" : "outline"}
+              className="text-[10px] font-mono"
+            >
               {user.org_id ?? "guest"}
             </Badge>
             <Button
@@ -80,7 +84,7 @@ export default function App() {
       </header>
 
       <main className="max-w-[1400px] mx-auto px-6 py-6 space-y-4">
-        {!user.org_id && <GuestBanner />}
+        {(user.org_id === GUEST_ORG_ID || !user.org_id) && <GuestBanner />}
         <KnowledgeIngest />
       </main>
     </div>

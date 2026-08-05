@@ -1,22 +1,9 @@
 import { useState } from "react";
-import { toast } from "sonner";
-import {
-  BrainCircuit,
-  Building2,
-  Check,
-  Copy,
-  Eye,
-  EyeOff,
-  Loader2,
-  Lock,
-  Mail,
-  Plus,
-  User,
-} from "lucide-react";
+import { BrainCircuit, Building2, Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { authErrorMessage } from "@/api/authClient";
-import { OrganizationsApi } from "@/api/authEndpoints";
+import { GUEST_ORG_ID } from "@/api/authTypes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -29,38 +16,9 @@ export function AuthScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
-  const [orgId, setOrgId] = useState("");
+  const [orgId, setOrgId] = useState(GUEST_ORG_ID);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const [showCreateOrg, setShowCreateOrg] = useState(false);
-  const [newOrgName, setNewOrgName] = useState("");
-  const [creatingOrg, setCreatingOrg] = useState(false);
-  const [justCreatedOrgId, setJustCreatedOrgId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  async function handleCreateOrg() {
-    if (!newOrgName.trim()) return;
-    setCreatingOrg(true);
-    try {
-      const org = await OrganizationsApi.register(newOrgName.trim());
-      setOrgId(org.org_id);
-      setJustCreatedOrgId(org.org_id);
-      toast.success("Organization created", { description: `${org.name} — ${org.org_id}` });
-    } catch (err) {
-      toast.error("Could not create organization", {
-        description: authErrorMessage(err, "The auth service is unreachable."),
-      });
-    } finally {
-      setCreatingOrg(false);
-    }
-  }
-
-  async function handleCopy(value: string) {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,7 +32,7 @@ export function AuthScreen() {
           email: email.trim().toLowerCase(),
           name: name.trim(),
           password,
-          org_id: orgId.trim() || undefined,
+          org_id: orgId.trim() || GUEST_ORG_ID,
         });
       }
     } catch (err) {
@@ -155,64 +113,12 @@ export function AuthScreen() {
             </div>
 
             {mode === "register" && (
-              <div className="space-y-2">
-                <Field
-                  icon={Building2}
-                  placeholder="Organization ID (optional)"
-                  value={orgId}
-                  onChange={(v) => {
-                    setOrgId(v);
-                    setJustCreatedOrgId(null);
-                  }}
-                />
+              <div className="space-y-1.5">
+                <Field icon={Building2} placeholder="Organization ID" value={orgId} onChange={setOrgId} />
                 <p className="text-[10px] text-muted-foreground pl-0.5">
-                  Leave blank to sign up as a guest — you can join an organization later.
+                  Defaults to the shared <span className="font-medium">Guest</span> organization —
+                  replace it with a specific Organization ID if you have one.
                 </p>
-
-                {justCreatedOrgId && (
-                  <div className="flex items-center gap-2 text-[10px] px-2.5 py-1.5 rounded-md bg-[#2ec28a]/10 border border-[#2ec28a]/25 text-[#2ec28a]">
-                    <Check className="w-3 h-3 shrink-0" />
-                    <span className="flex-1 font-mono truncate">{justCreatedOrgId}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(justCreatedOrgId)}
-                      className="hover:text-foreground shrink-0"
-                      aria-label="Copy organization ID"
-                    >
-                      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    </button>
-                  </div>
-                )}
-
-                {!showCreateOrg ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateOrg(true)}
-                    className="flex items-center gap-1 text-[10px] text-primary hover:underline"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Create a new organization instead
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      value={newOrgName}
-                      onChange={(e) => setNewOrgName(e.target.value)}
-                      placeholder="New organization name"
-                      className="flex-1 h-8 rounded-md border border-border bg-background px-2.5 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="h-8 text-xs shrink-0"
-                      disabled={!newOrgName.trim() || creatingOrg}
-                      onClick={handleCreateOrg}
-                    >
-                      {creatingOrg ? <Loader2 className="w-3 h-3 animate-spin" /> : "Create"}
-                    </Button>
-                  </div>
-                )}
               </div>
             )}
 
