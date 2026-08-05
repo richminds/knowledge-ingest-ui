@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { KnowledgeApi } from "./endpoints";
+import { useAuth } from "@/lib/auth";
 
 // No automatic polling — stats hits MongoDB directly, so the only refetch
 // triggers are the initial mount and the page's manual "Refresh" button.
@@ -11,10 +12,14 @@ export function useKnowledgeStats() {
   });
 }
 
+// Tags every resulting chunk with the signed-in user's own user_id/org_id
+// (see api/endpoints.ts::KnowledgeApi.upload) so query-time org isolation
+// (useRagQuery below) has something to filter on.
 export function useKnowledgeUpload() {
+  const { user } = useAuth();
   return useMutation({
     mutationFn: ({ files, chunkStrategy }: { files: File[]; chunkStrategy?: string }) =>
-      KnowledgeApi.upload(files, chunkStrategy),
+      KnowledgeApi.upload(files, chunkStrategy, user?.user_id, user?.org_id ?? undefined),
   });
 }
 
@@ -28,10 +33,14 @@ export function useKnowledgeFiles() {
   });
 }
 
-// Test-chat: runs the full RAG pipeline for one question (no server-side history).
+// Test-chat: runs the full RAG pipeline for one question (no server-side
+// history). Scopes results to the signed-in user's own org_id — a chunk
+// tagged with a different org_id is never returned, regardless of question.
 export function useRagQuery() {
+  const { user } = useAuth();
   return useMutation({
-    mutationFn: (question: string) => KnowledgeApi.query(question),
+    mutationFn: (question: string) =>
+      KnowledgeApi.query(question, user?.user_id, user?.org_id ?? undefined),
   });
 }
 
