@@ -1,8 +1,10 @@
 // Types mirror auth-service's Pydantic DTOs (features/schemas.py).
-// This is a separate identity service from knowledge-service — its JWT is
-// NOT understood by knowledge-service's own auth (RAG_JWT_SECRET / static
-// API keys), so it authenticates the human into this UI only. Requests to
-// knowledge-service still go out under VITE_API_KEY (see api/client.ts).
+// This is a separate deployable from knowledge-service, but its JWT IS
+// understood by knowledge-service's own auth when RAG_AUTH_ENABLED is set
+// with a matching RAG_JWT_SECRET/RAG_JWT_ISSUER (see api/client.ts, which
+// attaches this token as a Bearer header) — that's what lets knowledge-
+// service derive org_id/user_id from the verified token instead of trusting
+// the request body.
 
 // Mirrors auth-service's features/organization.py::GUEST_ORG_ID — the shared
 // organization every signup lands on by default (see AuthScreen.tsx). Kept as
