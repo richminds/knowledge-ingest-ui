@@ -40,8 +40,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-full">
-      <header className="border-b border-border/60">
+    <div className="min-h-full xl:h-screen xl:flex xl:flex-col xl:overflow-hidden">
+      <header className="border-b border-border/60 shrink-0">
         <div className="max-w-[1400px] mx-auto px-6 py-3.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[#8b5cf6] to-[#6366f1]">
@@ -83,9 +83,15 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-[1400px] mx-auto px-6 py-6 space-y-4">
-        {(user.org_id === GUEST_ORG_ID || !user.org_id) && <GuestBanner />}
-        <KnowledgeIngest />
+      <main className="max-w-[1400px] mx-auto px-6 py-6 space-y-4 w-full xl:flex xl:flex-col xl:flex-1 xl:min-h-0">
+        {(user.org_id === GUEST_ORG_ID || !user.org_id) && (
+          <div className="shrink-0">
+            <GuestBanner />
+          </div>
+        )}
+        <div className="xl:flex-1 xl:min-h-0">
+          <KnowledgeIngest />
+        </div>
       </main>
     </div>
   );
