@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { BrainCircuit, LogOut, Moon, Sun } from "lucide-react";
 import { KnowledgeIngest } from "@/pages/KnowledgeIngest";
 import { AuthScreen } from "@/pages/AuthScreen";
@@ -75,7 +76,12 @@ export default function App() {
               size="icon"
               className="h-8 w-8"
               aria-label="Log out"
-              onClick={() => logout()}
+              onClick={async () => {
+                // logout() clears the session even if the revoke call fails,
+                // so this always resolves — see lib/auth.tsx.
+                await logout();
+                toast.success("Logged out");
+              }}
             >
               <LogOut className="w-4 h-4" />
             </Button>

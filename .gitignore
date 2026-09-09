@@ -2,9 +2,31 @@ node_modules/
 dist/
 dist-ssr/
 *.local
-.env
 .vite/
 *.tsbuildinfo
 # tsc -b (tsconfig.node.json, composite) emits these next to vite.config.ts
 vite.config.js
 vite.config.d.ts
+
+# Local config. `.env` here holds deployed service URLs (and any keys added
+# later), and Vite also reads .env.development / .env.production — ignore the
+# whole family and keep only the committed template.
+.env
+.env.*
+!.env.example
+
+# Test output
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -28,3 +28,8 @@ export const OrganizationsApi = {
   join: (orgId: string) =>
     authApi.post<TokenResponse>("/auth/me/organization", { org_id: orgId }).then((r) => r.data),
 };
+
+// Account/organization administration (list, create, rename, delete) lives in
+// the standalone account-management-ui console, not here — see that repo's
+// README. This app only ever needs to mint an org at signup and let a guest
+// join one.
