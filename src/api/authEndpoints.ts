@@ -17,13 +17,6 @@ export const AuthApi = {
   logout: () => authApi.post<void>("/auth/logout").then(() => undefined),
 };
 
-export const OrganizationsApi = {
-  // Self-service: attach the caller's own still-guest account to an
-  // organization. 409 if already assigned, 404 if org_id doesn't exist.
-  join: (orgId: string) =>
-    authApi.post<TokenResponse>("/auth/me/organization", { org_id: orgId }).then((r) => r.data),
-};
-
-// Account/organization administration (list, create, rename, delete) lives in
+// Account administration (list, create, rename, delete) lives in
 // the standalone account-management-ui console, not here — see that repo's
 // README.

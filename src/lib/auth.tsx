@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { AuthApi, OrganizationsApi } from "@/api/authEndpoints";
+import { AuthApi } from "@/api/authEndpoints";
 import { ACCOUNT_KEY, TOKEN_KEY, USER_KEY } from "@/api/authClient";
 import type { AccountOption, AuthUser, LoginRequest, TokenResponse } from "@/api/authTypes";
 
@@ -17,7 +17,6 @@ interface AuthContextValue {
   login: (payload: LoginRequest) => Promise<AccountOption[]>;
   selectAccount: (accountId: string) => Promise<void>;
   logout: () => Promise<void>;
-  joinOrganization: (orgId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -35,7 +34,7 @@ function readStoredUser(): AuthUser | null {
 function persistSession(res: TokenResponse) {
   localStorage.setItem(TOKEN_KEY, res.access_token);
   localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-  if (res.account_id) localStorage.setItem(ACCOUNT_KEY, res.account_id);
+  if (res.user.account_id) localStorage.setItem(ACCOUNT_KEY, res.user.account_id);
   else localStorage.removeItem(ACCOUNT_KEY);
 }
 
@@ -96,18 +95,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await AuthApi.login(payload);
     persistSession(res);
     setUser(res.user);
-    setAccountId(res.account_id);
-    setAccounts(res.accounts);
-    setPendingAccountChoice(res.accounts.length > 1);
-    return res.accounts;
+    setAccountId(res.user.account_id);
+    setAccounts(res.user.accounts ?? []);
+    setPendingAccountChoice((res.user.accounts ?? []).length > 1);
+    return res.user.accounts ?? [];
   }
 
   async function selectAccount(nextAccountId: string) {
     const res = await AuthApi.selectAccount(nextAccountId);
     persistSession(res);
     setUser(res.user);
-    setAccountId(res.account_id);
-    setAccounts(res.accounts);
+    setAccountId(res.user.account_id);
+    setAccounts(res.user.accounts ?? []);
     setPendingAccountChoice(false);
   }
 
@@ -123,16 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Self-service: attach the current (guest) account to an organization —
-  // for a user who was never assigned one. Only succeeds while org_id is
-  // still unset server-side; otherwise 409 (see auth-service
-  // AlreadyAssignedError).
-  async function joinOrganization(orgId: string) {
-    const res = await OrganizationsApi.join(orgId);
-    persistSession(res);
-    setUser(res.user);
-    setAccountId(res.account_id);
-  }
 
   return (
     <AuthContext.Provider
@@ -145,7 +134,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         selectAccount,
         logout,
-        joinOrganization,
       }}
     >
       {children}

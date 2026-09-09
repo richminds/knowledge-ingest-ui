@@ -3,11 +3,9 @@ import { toast } from "sonner";
 import { BrainCircuit, LogOut, Moon, Sun } from "lucide-react";
 import { KnowledgeIngest } from "@/pages/KnowledgeIngest";
 import { AuthScreen } from "@/pages/AuthScreen";
-import { GuestBanner } from "@/components/GuestBanner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
-import { GUEST_ORG_ID } from "@/api/authTypes";
 
 const THEME_KEY = "knowledge-ingest-theme";
 
@@ -64,12 +62,11 @@ export default function App() {
                 {accounts.find((a) => a.account_id === accountId)?.name ?? accountId}
               </Badge>
             )}
-            <Badge
-              variant={user.org_id === GUEST_ORG_ID ? "warning" : "outline"}
-              className="text-[10px] font-mono"
-            >
-              {user.org_id ?? "guest"}
-            </Badge>
+            {!user.account_id && (
+              <Badge variant="warning" className="text-[10px] font-mono">
+                no account
+              </Badge>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -98,11 +95,6 @@ export default function App() {
       </header>
 
       <main className="max-w-[1400px] mx-auto px-6 py-6 space-y-4 w-full xl:flex xl:flex-col xl:flex-1 xl:min-h-0">
-        {(user.org_id === GUEST_ORG_ID || !user.org_id) && (
-          <div className="shrink-0">
-            <GuestBanner />
-          </div>
-        )}
         <div className="xl:flex-1 xl:min-h-0">
           <KnowledgeIngest />
         </div>

@@ -331,7 +331,7 @@ export function KnowledgeIngest() {
                     {formatDate(f.uploaded_at)}
                   </span>
                   <span className="text-[10px] text-muted-foreground shrink-0">{bytes(f.size)}</span>
-                  {(!f.org_id || f.org_id === "*") && (
+                  {(!f.account_id || f.account_id === "*") && (
                     <Badge variant="secondary" className="text-[9px] shrink-0">
                       shared
                     </Badge>

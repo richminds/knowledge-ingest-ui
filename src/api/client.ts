@@ -18,7 +18,7 @@ export const api = axios.create({
 // Static API key, if the target knowledge-service has KNOWLEDGE_API_KEYS
 // configured (see app/middleware/auth.py — X-API-Key or Bearer, either works).
 // NOTE: a static key is checked BEFORE the Bearer JWT below and, when it
-// matches, wins outright — knowledge-service then trusts whatever org_id/
+// matches, wins outright — knowledge-service then trusts whatever account_id/
 // user_id this app puts in the request body instead of deriving them from
 // the signed-in user's token. Only set this for a deployment that
 // intentionally wants every request treated as one shared service principal
@@ -31,7 +31,7 @@ if (apiKey) {
 // The signed-in user's auth-service access token (see lib/auth.tsx). Sent as
 // a normal Bearer JWT — knowledge-service validates it (shared secret/issuer
 // with auth-service, see rag/auth.py + app/middleware/auth.py) and derives
-// org_id/user_id from its verified claims rather than trusting the request
+// account_id/user_id from its verified claims rather than trusting the request
 // body, so this is what makes org-scoped requests (query/upload/files)
 // actually enforce tenant isolation instead of taking the caller's word for it.
 api.interceptors.request.use((config) => {
