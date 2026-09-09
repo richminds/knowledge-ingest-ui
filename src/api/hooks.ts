@@ -34,7 +34,7 @@ export function useKnowledgeUpload() {
 // are part of the query key so switching accounts never shows a stale cached
 // list from another one.
 export function useKnowledgeFiles() {
-  const { user, accountId } = useAuth();
+  const { accountId } = useAuth();
   return useQuery({
     queryKey: ["knowledge", "files", accountId ?? null],
     queryFn: () => KnowledgeApi.files(100, accountId ?? undefined),

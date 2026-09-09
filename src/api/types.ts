@@ -39,6 +39,9 @@ export interface KnowledgeFile {
   content_type?: string | null;
   uploaded_at?: string | null;
   uploaded_by?: string | null;
+  // The application this file was uploaded under — the access-control field
+  // list() filters on. Null/"*" means unscoped (visible to every account).
+  account_id?: string | null;
 }
 
 // GET /v1/files
