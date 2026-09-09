@@ -12,120 +12,60 @@ import {
   Mail,
   ShieldCheck,
   Sparkles,
-  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { authErrorMessage } from "@/api/authClient";
-import { GUEST_ORG_ID } from "@/api/authTypes";
 import { Button } from "@/components/ui/button";
 
-// Layout/treatment ported from the makemerich frontend's Login.js + Register.js
-// (gradient hero, floating circles, split marketing panel with glass feature
-// cards, elevated form card, icon-adorned fields, divider + mode-switch link) —
-// rebuilt in Tailwind because this app has no MUI, and pointed at auth-service
-// (see api/authEndpoints.ts) rather than makemerich-backend's /token endpoint.
-type Mode = "login" | "register";
-
-const FEATURES: Record<Mode, { icon: typeof Database; title: string; body: string }[]> = {
-  login: [
-    {
-      icon: Database,
-      title: "Document Ingestion",
-      body: "Upload PDFs, text and markdown straight into the RAG vector store",
-    },
-    {
-      icon: Sparkles,
-      title: "Retrieval Testing",
-      body: "Ask questions and see exactly which chunks the answer came from",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Scoped by Account",
-      body: "Every chunk is tagged and filtered by the account you belong to",
-    },
-  ],
-  register: [
-    {
-      icon: Sparkles,
-      title: "Instant Setup",
-      body: "Create an account and start ingesting documents in under a minute",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Isolated by Design",
-      body: "Your documents stay scoped to your account — never mixed with others",
-    },
-    {
-      icon: Database,
-      title: "Durable Storage",
-      body: "Uploads persist in MongoDB GridFS and survive service restarts",
-    },
-  ],
-};
-
-const COPY: Record<Mode, { lead: string; accent: string; blurb: string; heading: string; sub: string }> = {
-  login: {
-    lead: "Welcome Back to",
-    accent: "Knowledge Ingest",
-    blurb:
-      "Pick up where you left off — upload new documents, inspect what's indexed, and test retrieval end to end.",
-    heading: "Welcome Back",
-    sub: "Sign in to access your ingestion console",
+// Layout/treatment ported from the makemerich frontend's Login.js (gradient
+// hero, floating circles, split marketing panel with glass feature cards,
+// elevated form card, icon-adorned fields) — rebuilt in Tailwind because this
+// app has no MUI, and pointed at auth-service (see api/authEndpoints.ts).
+//
+// Sign-in only: this console never creates users. Accounts and their
+// application memberships are provisioned in the account-management console;
+// people sign in with what they were given, and pick which application to
+// work under when they belong to more than one.
+const FEATURES = [
+  {
+    icon: Database,
+    title: "Document Ingestion",
+    body: "Upload PDFs, text and markdown straight into the RAG vector store",
   },
-  register: {
-    lead: "Build Your Own",
-    accent: "Knowledge Base",
-    blurb:
-      "Create an account to ingest documents, index them for retrieval, and query them with full source attribution.",
-    heading: "Create Account",
-    sub: "Start ingesting documents today",
+  {
+    icon: Sparkles,
+    title: "Retrieval Testing",
+    body: "Ask questions and see exactly which chunks the answer came from",
   },
-};
+  {
+    icon: ShieldCheck,
+    title: "Scoped by Account",
+    body: "Every chunk is tagged and filtered by the account you sign in under",
+  },
+];
 
 export function AuthScreen() {
-  const { login, register } = useAuth();
-  const [mode, setMode] = useState<Mode>("login");
+  const { login, selectAccount, accounts, accountId, pendingAccountChoice } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [name, setName] = useState("");
-  const [orgId, setOrgId] = useState(GUEST_ORG_ID);
+  const [chosenAccount, setChosenAccount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function switchMode(next: Mode) {
-    setMode(next);
-    setError(null);
-    setConfirmPassword("");
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-
-    // Client-side check first (makemerich's Register.js does the same) — the
-    // service never sees the confirmation field.
-    if (mode === "register" && password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
     setSubmitting(true);
     try {
-      if (mode === "login") {
-        await login({ email: email.trim().toLowerCase(), password });
-        toast.success("Signed in");
+      const available = await login({ email: email.trim().toLowerCase(), password });
+      if (available.length > 1) {
+        // Multi-account user: the session exists but is still parked on their
+        // default account until they confirm one (see AuthProvider).
+        setChosenAccount(accountId ?? available[0].account_id);
       } else {
-        await register({
-          email: email.trim().toLowerCase(),
-          name: name.trim(),
-          password,
-          org_id: orgId.trim() || GUEST_ORG_ID,
-        });
-        toast.success("Account created");
+        toast.success("Signed in");
       }
     } catch (err) {
       const message = authErrorMessage(
@@ -133,15 +73,45 @@ export function AuthScreen() {
         "Something went wrong — check the auth service is reachable."
       );
       setError(message);
-      toast.error(mode === "login" ? "Sign in failed" : "Could not create account", {
-        description: message,
-      });
+      toast.error("Sign in failed", { description: message });
     } finally {
       setSubmitting(false);
     }
   }
 
-  const copy = COPY[mode];
+  async function handleChooseAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await selectAccount(chosenAccount);
+      toast.success("Signed in");
+    } catch (err) {
+      const message = authErrorMessage(err, "Could not switch to that account.");
+      setError(message);
+      toast.error("Account selection failed", { description: message });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const copy = pendingAccountChoice
+    ? {
+        lead: "Choose Your",
+        accent: "Account",
+        blurb:
+          "You belong to more than one application. Everything you ingest and every answer you get back is scoped to the one you pick.",
+        heading: "Select Account",
+        sub: "Pick the application to work under",
+      }
+    : {
+        lead: "Welcome Back to",
+        accent: "Knowledge Ingest",
+        blurb:
+          "Pick up where you left off — upload new documents, inspect what's indexed, and test retrieval end to end.",
+        heading: "Welcome Back",
+        sub: "Sign in to access your ingestion console",
+      };
 
   return (
     <div className="relative min-h-full overflow-hidden bg-[linear-gradient(135deg,#312e81_0%,#6366f1_55%,#8b5cf6_100%)]">
@@ -163,7 +133,7 @@ export function AuthScreen() {
           <p className="mb-8 max-w-lg text-base leading-relaxed text-white/90">{copy.blurb}</p>
 
           <div className="space-y-3">
-            {FEATURES[mode].map(({ icon: Icon, title, body }) => (
+            {FEATURES.map(({ icon: Icon, title, body }) => (
               <div
                 key={title}
                 className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md"
@@ -199,114 +169,95 @@ export function AuthScreen() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {mode === "register" && (
+            {pendingAccountChoice ? (
+              <form onSubmit={handleChooseAccount} className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block pl-0.5 text-xs font-medium text-muted-foreground">
+                    Account
+                  </label>
+                  <div className="relative">
+                    <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <select
+                      value={chosenAccount}
+                      onChange={(e) => setChosenAccount(e.target.value)}
+                      className="h-11 w-full appearance-none rounded-lg border border-border bg-background pl-10 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {accounts.map((account) => (
+                        <option key={account.account_id} value={account.account_id}>
+                          {account.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="mt-1.5 pl-0.5 text-[11px] text-muted-foreground">
+                    Documents and answers are scoped to this account — you can sign out and back in
+                    to switch.
+                  </p>
+                </div>
+
+                <Button type="submit" className="h-11 w-full text-sm" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Continuing…
+                    </>
+                  ) : (
+                    "Continue"
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleSignIn} className="space-y-4">
                 <Field
-                  icon={User}
-                  label="Full Name"
-                  placeholder="Ada Lovelace"
-                  value={name}
-                  onChange={setName}
+                  icon={Mail}
+                  label="Email Address"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={setEmail}
                   required
                 />
-              )}
 
-              <Field
-                icon={Mail}
-                label="Email Address"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={setEmail}
-                required
-              />
-
-              <Field
-                icon={Lock}
-                label="Password"
-                type={showPassword ? "text" : "password"}
-                placeholder="At least 6 characters"
-                value={password}
-                onChange={setPassword}
-                required
-                minLength={6}
-                trailing={
-                  <RevealButton shown={showPassword} onToggle={() => setShowPassword((s) => !s)} />
-                }
-              />
-
-              {mode === "register" && (
-                <>
-                  <Field
-                    icon={Lock}
-                    label="Confirm Password"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Re-enter your password"
-                    value={confirmPassword}
-                    onChange={setConfirmPassword}
-                    required
-                    minLength={6}
-                    trailing={
-                      <RevealButton
-                        shown={showConfirmPassword}
-                        onToggle={() => setShowConfirmPassword((s) => !s)}
-                      />
-                    }
-                  />
-
-                  <div>
-                    <Field
-                      icon={Building2}
-                      label="Account ID"
-                      placeholder={GUEST_ORG_ID}
-                      value={orgId}
-                      onChange={setOrgId}
+                <Field
+                  icon={Lock}
+                  label="Password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Your password"
+                  value={password}
+                  onChange={setPassword}
+                  required
+                  minLength={6}
+                  trailing={
+                    <RevealButton
+                      shown={showPassword}
+                      onToggle={() => setShowPassword((s) => !s)}
                     />
-                    <p className="mt-1.5 pl-0.5 text-[11px] text-muted-foreground">
-                      Defaults to the shared <span className="font-medium">Guest</span> account —
-                      replace it with a specific Account ID if you have one.
-                    </p>
-                  </div>
-                </>
-              )}
+                  }
+                />
 
-              <Button type="submit" className="h-11 w-full text-sm" disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {mode === "login" ? "Signing In…" : "Creating Account…"}
-                  </>
-                ) : mode === "login" ? (
-                  "Sign In"
-                ) : (
-                  "Create Account"
-                )}
-              </Button>
-            </form>
+                <Button type="submit" className="h-11 w-full text-sm" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Signing In…
+                    </>
+                  ) : (
+                    "Sign In"
+                  )}
+                </Button>
+              </form>
+            )}
 
-            <div className="my-6 flex items-center gap-3">
-              <span className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted-foreground">
-                {mode === "login" ? "New to Knowledge Ingest?" : "Already have an account?"}
-              </span>
-              <span className="h-px flex-1 bg-border" />
-            </div>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => switchMode(mode === "login" ? "register" : "login")}
-                className="text-sm font-semibold text-primary transition-colors hover:text-primary/80"
-              >
-                {mode === "login" ? "Create Your Account" : "Sign In Instead"}
-              </button>
-            </div>
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              Accounts are created by your administrator — contact them if you can't sign in.
+            </p>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 function RevealButton({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
   return (

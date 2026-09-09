@@ -1,13 +1,21 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { AuthApi, OrganizationsApi } from "@/api/authEndpoints";
-import { TOKEN_KEY, USER_KEY } from "@/api/authClient";
-import type { AuthUser, LoginRequest, RegisterRequest } from "@/api/authTypes";
+import { ACCOUNT_KEY, TOKEN_KEY, USER_KEY } from "@/api/authClient";
+import type { AccountOption, AuthUser, LoginRequest, TokenResponse } from "@/api/authTypes";
 
 interface AuthContextValue {
   user: AuthUser | null;
+  /** The app account the current token is scoped to — what knowledge-service
+   *  filters every chunk and file on. */
+  accountId: string | null;
+  /** Every account the signed-in user may work under. */
+  accounts: AccountOption[];
+  /** True only while a multi-account user still has to pick one; App renders
+   *  the picker instead of the console until then. */
+  pendingAccountChoice: boolean;
   loading: boolean;
-  login: (payload: LoginRequest) => Promise<void>;
-  register: (payload: RegisterRequest) => Promise<void>;
+  login: (payload: LoginRequest) => Promise<AccountOption[]>;
+  selectAccount: (accountId: string) => Promise<void>;
   logout: () => Promise<void>;
   joinOrganization: (orgId: string) => Promise<void>;
 }
@@ -24,25 +32,36 @@ function readStoredUser(): AuthUser | null {
   }
 }
 
-function persistSession(token: string, user: AuthUser) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+function persistSession(res: TokenResponse) {
+  localStorage.setItem(TOKEN_KEY, res.access_token);
+  localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+  if (res.account_id) localStorage.setItem(ACCOUNT_KEY, res.account_id);
+  else localStorage.removeItem(ACCOUNT_KEY);
 }
 
 function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(ACCOUNT_KEY);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(readStoredUser);
+  const [accountId, setAccountId] = useState<string | null>(() =>
+    localStorage.getItem(ACCOUNT_KEY)
+  );
+  const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [pendingAccountChoice, setPendingAccountChoice] = useState(false);
   // Only true during the initial silent re-validation of a stored session —
-  // register()/login() below show their own inline pending state instead.
+  // login() below shows its own inline pending state instead.
   const [loading, setLoading] = useState(Boolean(localStorage.getItem(TOKEN_KEY)));
 
   useEffect(() => {
     function onUnauthorized() {
       setUser(null);
+      setAccountId(null);
+      setAccounts([]);
+      setPendingAccountChoice(false);
     }
     window.addEventListener("auth:unauthorized", onUnauthorized);
     return () => window.removeEventListener("auth:unauthorized", onUnauthorized);
@@ -64,20 +83,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         clearSession();
         setUser(null);
+        setAccountId(null);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  async function login(payload: LoginRequest) {
+  /** Sign in and return the accounts this user may work under. The session is
+   *  established immediately, scoped to their default account; when there is
+   *  more than one, `pendingAccountChoice` holds the console back until
+   *  selectAccount() confirms which one. */
+  async function login(payload: LoginRequest): Promise<AccountOption[]> {
     const res = await AuthApi.login(payload);
-    persistSession(res.access_token, res.user);
+    persistSession(res);
     setUser(res.user);
+    setAccountId(res.account_id);
+    setAccounts(res.accounts);
+    setPendingAccountChoice(res.accounts.length > 1);
+    return res.accounts;
   }
 
-  async function register(payload: RegisterRequest) {
-    const res = await AuthApi.register(payload);
-    persistSession(res.access_token, res.user);
+  async function selectAccount(nextAccountId: string) {
+    const res = await AuthApi.selectAccount(nextAccountId);
+    persistSession(res);
     setUser(res.user);
+    setAccountId(res.account_id);
+    setAccounts(res.accounts);
+    setPendingAccountChoice(false);
   }
 
   async function logout() {
@@ -86,20 +117,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       clearSession();
       setUser(null);
+      setAccountId(null);
+      setAccounts([]);
+      setPendingAccountChoice(false);
     }
   }
 
   // Self-service: attach the current (guest) account to an organization —
-  // for a signup that skipped org_id. Only succeeds while org_id is still
-  // unset server-side; otherwise 409 (see auth-service AlreadyAssignedError).
+  // for a user who was never assigned one. Only succeeds while org_id is
+  // still unset server-side; otherwise 409 (see auth-service
+  // AlreadyAssignedError).
   async function joinOrganization(orgId: string) {
     const res = await OrganizationsApi.join(orgId);
-    persistSession(res.access_token, res.user);
+    persistSession(res);
     setUser(res.user);
+    setAccountId(res.account_id);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, joinOrganization }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        accountId,
+        accounts,
+        pendingAccountChoice,
+        loading,
+        login,
+        selectAccount,
+        logout,
+        joinOrganization,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

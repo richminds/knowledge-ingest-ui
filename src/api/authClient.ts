@@ -7,6 +7,11 @@ const baseURL = import.meta.env.VITE_AUTH_BASE_URL || "";
 
 export const TOKEN_KEY = "knowledge-ingest.auth_token";
 export const USER_KEY = "knowledge-ingest.auth_user";
+// The app account the stored token is scoped to. Kept separately from the
+// user record because /auth/me returns the user's DEFAULT account, while the
+// token may be scoped to another one they picked at sign-in — and it's the
+// token's claim that knowledge-service filters on.
+export const ACCOUNT_KEY = "knowledge-ingest.auth_account";
 
 export const authApi = axios.create({
   baseURL,
@@ -29,9 +34,10 @@ authApi.interceptors.response.use(
   (res) => res,
   (error) => {
     const url: string = error.config?.url ?? "";
-    if (error.response?.status === 401 && !url.includes("/auth/login") && !url.includes("/auth/register")) {
+    if (error.response?.status === 401 && !url.includes("/auth/login")) {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(ACCOUNT_KEY);
       window.dispatchEvent(new CustomEvent("auth:unauthorized"));
     }
     return Promise.reject(error);

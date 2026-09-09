@@ -19,7 +19,7 @@ function getInitialTheme(): "light" | "dark" {
 
 export default function App() {
   const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
-  const { user, loading, logout } = useAuth();
+  const { user, accountId, accounts, pendingAccountChoice, loading, logout } = useAuth();
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -36,7 +36,10 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  // AuthScreen doubles as the account picker for a user who belongs to more
+  // than one application — the session exists by then, but which account it's
+  // scoped to isn't settled yet.
+  if (!user || pendingAccountChoice) {
     return <AuthScreen />;
   }
 
@@ -56,6 +59,11 @@ export default function App() {
               <span className="text-xs font-medium leading-tight">{user.name}</span>
               <span className="text-[10px] text-muted-foreground leading-tight">{user.email}</span>
             </div>
+            {accountId && (
+              <Badge variant="outline" className="text-[10px] font-mono">
+                {accounts.find((a) => a.account_id === accountId)?.name ?? accountId}
+              </Badge>
+            )}
             <Badge
               variant={user.org_id === GUEST_ORG_ID ? "warning" : "outline"}
               className="text-[10px] font-mono"

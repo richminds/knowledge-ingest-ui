@@ -15,27 +15,41 @@ export interface AuthUser {
   user_id: string;
   email: string;
   name: string;
+  account_id: string | null;
+  account_ids?: string[];
   org_id: string | null;
   is_portless: boolean;
   created_at?: string | null;
+}
+
+// One application (auth-service app account) the signed-in user may work
+// under. Returned by /auth/login only AFTER the password checks out — which
+// accounts an email belongs to isn't public information.
+export interface AccountOption {
+  account_id: string;
+  name: string;
 }
 
 export interface TokenResponse {
   access_token: string;
   token_type: string;
   user: AuthUser;
-}
-
-export interface RegisterRequest {
-  email: string;
-  name: string;
-  password: string;
-  org_id?: string | null;
+  // The account this token is scoped to — knowledge-service reads it from
+  // the token's claims and filters every chunk/file on it.
+  account_id: string | null;
+  accounts: AccountOption[];
 }
 
 export interface LoginRequest {
   email: string;
   password: string;
+  account_id?: string | null;
+}
+
+// POST /auth/me/account — exchange the current token for one scoped to a
+// different account the same user belongs to.
+export interface SelectAccountRequest {
+  account_id: string;
 }
 
 // POST /auth/organizations/register (self-serve, no auth required)
