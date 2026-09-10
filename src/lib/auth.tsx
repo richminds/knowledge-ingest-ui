@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { AuthApi } from "@/api/authEndpoints";
 import { ACCOUNT_KEY, TOKEN_KEY, USER_KEY } from "@/api/authClient";
 import type { AccountOption, AuthUser, LoginRequest, TokenResponse } from "@/api/authTypes";
+import { selectedAccountId } from "@/api/authTypes";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -10,8 +11,10 @@ interface AuthContextValue {
   accountId: string | null;
   /** Every account the signed-in user may work under. */
   accounts: AccountOption[];
-  /** True only while a multi-account user still has to pick one; App renders
-   *  the picker instead of the console until then. */
+  /** True from sign-in until the user confirms which account to work under;
+   *  App renders the picker instead of the console while it is set. Applies to
+   *  anyone with at least one account, not only multi-account users — see
+   *  login() for why a single account is confirmed too. */
   pendingAccountChoice: boolean;
   loading: boolean;
   login: (payload: LoginRequest) => Promise<AccountOption[]>;
@@ -34,7 +37,8 @@ function readStoredUser(): AuthUser | null {
 function persistSession(res: TokenResponse) {
   localStorage.setItem(TOKEN_KEY, res.access_token);
   localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-  if (res.user.account_id) localStorage.setItem(ACCOUNT_KEY, res.user.account_id);
+  const scoped = selectedAccountId(res.user);
+  if (scoped) localStorage.setItem(ACCOUNT_KEY, scoped);
   else localStorage.removeItem(ACCOUNT_KEY);
 }
 
@@ -78,6 +82,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((fresh) => {
         setUser(fresh);
         localStorage.setItem(USER_KEY, JSON.stringify(fresh));
+        // /auth/me reports the account the STORED TOKEN is scoped to, which is
+        // the authority — re-sync from it rather than trusting the separately
+        // cached ACCOUNT_KEY, which can go stale if a switch was interrupted.
+        const scoped = selectedAccountId(fresh);
+        setAccountId(scoped);
+        setAccounts(fresh.accounts ?? []);
+        if (scoped) localStorage.setItem(ACCOUNT_KEY, scoped);
+        else localStorage.removeItem(ACCOUNT_KEY);
       })
       .catch(() => {
         clearSession();
@@ -87,17 +99,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  /** Sign in and return the accounts this user may work under. The session is
-   *  established immediately, scoped to their default account; when there is
-   *  more than one, `pendingAccountChoice` holds the console back until
-   *  selectAccount() confirms which one. */
+  /** Sign in and return the accounts this user may work under.
+   *
+   *  The session is established immediately, scoped to their default account,
+   *  but `pendingAccountChoice` holds the console on the picker until
+   *  selectAccount() confirms which one — for ANY user who belongs to at least
+   *  one account, not just those with several.
+   *
+   *  Confirming a single account too looks redundant, but the account decides
+   *  which chunks every upload is tagged with and which ones a query can see
+   *  (knowledge-service filters on the token's claim). Showing it once at
+   *  sign-in makes that scope explicit rather than something the user has to
+   *  infer from a badge after the fact. A user who belongs to NO account has
+   *  nothing to confirm, so they go straight through — unscoped, which the
+   *  header flags. */
   async function login(payload: LoginRequest): Promise<AccountOption[]> {
     const res = await AuthApi.login(payload);
     persistSession(res);
     setUser(res.user);
-    setAccountId(res.user.account_id);
+    setAccountId(selectedAccountId(res.user));
     setAccounts(res.user.accounts ?? []);
-    setPendingAccountChoice((res.user.accounts ?? []).length > 1);
+    setPendingAccountChoice((res.user.accounts ?? []).length > 0);
     return res.user.accounts ?? [];
   }
 
@@ -105,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await AuthApi.selectAccount(nextAccountId);
     persistSession(res);
     setUser(res.user);
-    setAccountId(res.user.account_id);
+    setAccountId(selectedAccountId(res.user));
     setAccounts(res.user.accounts ?? []);
     setPendingAccountChoice(false);
   }

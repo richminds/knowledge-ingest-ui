@@ -34,9 +34,9 @@ export default function App() {
     );
   }
 
-  // AuthScreen doubles as the account picker for a user who belongs to more
-  // than one application — the session exists by then, but which account it's
-  // scoped to isn't settled yet.
+  // AuthScreen doubles as the account picker — after sign-in the session
+  // exists, but which account it is scoped to isn't settled until the user
+  // confirms one (see lib/auth.tsx::login).
   if (!user || pendingAccountChoice) {
     return <AuthScreen />;
   }
@@ -62,7 +62,7 @@ export default function App() {
                 {accounts.find((a) => a.account_id === accountId)?.name ?? accountId}
               </Badge>
             )}
-            {!user.account_id && (
+            {!accountId && (
               <Badge variant="warning" className="text-[10px] font-mono">
                 no account
               </Badge>
@@ -95,8 +95,15 @@ export default function App() {
       </header>
 
       <main className="max-w-[1400px] mx-auto px-6 py-6 space-y-4 w-full xl:flex xl:flex-col xl:flex-1 xl:min-h-0">
+        {/* Keyed on the user AND the account: the console is scoped to that
+            combination, so switching either one must start clean. Without the
+            key, React reuses the mounted tree and its local state — a queued
+            job id, staged files, the test-chat transcript — would carry over
+            from the previous account and read as if it belonged to the new
+            one. Remounting also drops per-account query caches on the floor
+            rather than briefly showing another account's files. */}
         <div className="xl:flex-1 xl:min-h-0">
-          <KnowledgeIngest />
+          <KnowledgeIngest key={`${user.user_id}:${accountId ?? "none"}`} />
         </div>
       </main>
     </div>

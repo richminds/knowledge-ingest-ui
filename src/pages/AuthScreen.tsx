@@ -46,7 +46,7 @@ const FEATURES = [
 ];
 
 export function AuthScreen() {
-  const { login, selectAccount, accounts, accountId, pendingAccountChoice } = useAuth();
+  const { login, selectAccount, accounts, pendingAccountChoice } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -60,11 +60,16 @@ export function AuthScreen() {
     setSubmitting(true);
     try {
       const available = await login({ email: email.trim().toLowerCase(), password });
-      if (available.length > 1) {
-        // Multi-account user: the session exists but is still parked on their
-        // default account until they confirm one (see AuthProvider).
-        setChosenAccount(accountId ?? available[0].account_id);
+      if (available.length > 0) {
+        // The session exists but is still parked on their default account
+        // until they confirm one (see AuthProvider.login). Pre-select the
+        // account auth-service already scoped the token to — read from the
+        // RETURNED list rather than the `accountId` in scope, which is still
+        // the pre-login value on this render.
+        const preselected = available.find((a) => a.selected) ?? available[0];
+        setChosenAccount(preselected.account_id);
       } else {
+        // No account to confirm — straight in, unscoped.
         toast.success("Signed in");
       }
     } catch (err) {
@@ -95,14 +100,18 @@ export function AuthScreen() {
     }
   }
 
+  const multiple = accounts.length > 1;
   const copy = pendingAccountChoice
     ? {
         lead: "Choose Your",
         accent: "Account",
-        blurb:
-          "You belong to more than one application. Everything you ingest and every answer you get back is scoped to the one you pick.",
+        blurb: multiple
+          ? "You belong to more than one application. Everything you ingest and every answer you get back is scoped to the one you pick."
+          : "Everything you ingest and every answer you get back is scoped to this account.",
         heading: "Select Account",
-        sub: "Pick the application to work under",
+        sub: multiple
+          ? "Pick the application to work under"
+          : "Confirm the application to work under",
       }
     : {
         lead: "Welcome Back to",
@@ -173,29 +182,72 @@ export function AuthScreen() {
               <form onSubmit={handleChooseAccount} className="space-y-4">
                 <div>
                   <label className="mb-1.5 block pl-0.5 text-xs font-medium text-muted-foreground">
-                    Account
+                    {multiple ? "Accounts (" + accounts.length + ")" : "Account"}
                   </label>
-                  <div className="relative">
-                    <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <select
-                      value={chosenAccount}
-                      onChange={(e) => setChosenAccount(e.target.value)}
-                      className="h-11 w-full appearance-none rounded-lg border border-border bg-background pl-10 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {accounts.map((account) => (
-                        <option key={account.account_id} value={account.account_id}>
-                          {account.name}
-                        </option>
-                      ))}
-                    </select>
+
+                  {/* A visible list rather than a <select>: the account decides
+                      what every upload is tagged with and what a query can see,
+                      so the options are worth showing outright instead of
+                      hiding them behind a closed dropdown. Radio inputs (not
+                      buttons) so arrow keys move between accounts and the group
+                      is announced as one choice. */}
+                  <div
+                    role="radiogroup"
+                    aria-label="Account to work under"
+                    className="max-h-64 space-y-1.5 overflow-y-auto pr-0.5"
+                  >
+                    {accounts.map((account) => {
+                      const active = account.account_id === chosenAccount;
+                      return (
+                        <label
+                          key={account.account_id}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+                            active
+                              ? "border-[#6366f1] bg-[#6366f1]/10"
+                              : "border-border hover:bg-muted/60"
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="account"
+                            value={account.account_id}
+                            checked={active}
+                            onChange={() => setChosenAccount(account.account_id)}
+                            className="sr-only"
+                          />
+                          <Building2
+                            className={cn(
+                              "h-4 w-4 shrink-0",
+                              active ? "text-[#6366f1]" : "text-muted-foreground"
+                            )}
+                          />
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                            {account.name}
+                          </span>
+                          <span
+                            className={cn(
+                              "h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors",
+                              active ? "border-[#6366f1] bg-[#6366f1]" : "border-border"
+                            )}
+                            aria-hidden
+                          />
+                        </label>
+                      );
+                    })}
                   </div>
-                  <p className="mt-1.5 pl-0.5 text-[11px] text-muted-foreground">
+
+                  <p className="mt-2 pl-0.5 text-[11px] text-muted-foreground">
                     Documents and answers are scoped to this account — you can sign out and back in
                     to switch.
                   </p>
                 </div>
 
-                <Button type="submit" className="h-11 w-full text-sm" disabled={submitting}>
+                <Button
+                  type="submit"
+                  className="h-11 w-full text-sm"
+                  disabled={submitting || !chosenAccount}
+                >
                   {submitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
