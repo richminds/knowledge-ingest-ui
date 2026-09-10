@@ -54,6 +54,29 @@ export interface LoginRequest {
   account_id?: string | null;
 }
 
+/** The app account self-service sign-ups land in.
+ *
+ *  A UUID like every account ID, but a DERIVED one (auth-service
+ *  features/account_ids.py) rather than a minted one — this console has to
+ *  name the account before it has any session to look one up with, so the
+ *  value must be knowable ahead of time. auth-service bootstraps the matching
+ *  account at startup, so the two cannot drift.
+ *
+ *  Overridable for a deployment that routes sign-ups somewhere else. */
+export const GUEST_ACCOUNT_ID =
+  import.meta.env.VITE_GUEST_ACCOUNT_ID || "1990b268-3b12-50ab-9be3-09970c1bcfc8";
+
+// POST /auth/register — public, unlike account administration. `account_id`
+// names the app account the new user belongs to; auth-service 404s if it
+// doesn't exist and refuses self-registration into the ADMIN account once one
+// admin exists, so this can only ever create ordinary guest users.
+export interface RegisterRequest {
+  email: string;
+  name: string;
+  password: string;
+  account_id?: string | null;
+}
+
 // POST /auth/me/account — exchange the current token for one scoped to a
 // different account the same user belongs to.
 export interface SelectAccountRequest {

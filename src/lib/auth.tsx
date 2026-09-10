@@ -1,8 +1,14 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { AuthApi } from "@/api/authEndpoints";
 import { ACCOUNT_KEY, TOKEN_KEY, USER_KEY } from "@/api/authClient";
-import type { AccountOption, AuthUser, LoginRequest, TokenResponse } from "@/api/authTypes";
-import { selectedAccountId } from "@/api/authTypes";
+import type {
+  AccountOption,
+  AuthUser,
+  LoginRequest,
+  RegisterRequest,
+  TokenResponse,
+} from "@/api/authTypes";
+import { GUEST_ACCOUNT_ID, selectedAccountId } from "@/api/authTypes";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -18,6 +24,8 @@ interface AuthContextValue {
   pendingAccountChoice: boolean;
   loading: boolean;
   login: (payload: LoginRequest) => Promise<AccountOption[]>;
+  /** Self-service sign-up into the guest account; signs the new user in. */
+  register: (payload: Omit<RegisterRequest, "account_id">) => Promise<AccountOption[]>;
   selectAccount: (accountId: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -123,6 +131,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.user.accounts ?? [];
   }
 
+  /** Create a user in the guest account and sign them straight in.
+   *
+   *  Shares login()'s post-sign-in path deliberately: /auth/register returns
+   *  the same token envelope, so the new user goes through the same account
+   *  confirmation step and ends up in exactly the state a returning user
+   *  would — one flow to reason about, not two.
+   *
+   *  The account is fixed to GUEST_ACCOUNT_ID rather than taken from the
+   *  caller: this form is public, and letting it name an account would let
+   *  anyone register into someone else's. */
+  async function register(payload: Omit<RegisterRequest, "account_id">): Promise<AccountOption[]> {
+    const res = await AuthApi.register({ ...payload, account_id: GUEST_ACCOUNT_ID });
+    persistSession(res);
+    setUser(res.user);
+    setAccountId(selectedAccountId(res.user));
+    setAccounts(res.user.accounts ?? []);
+    setPendingAccountChoice((res.user.accounts ?? []).length > 0);
+    return res.user.accounts ?? [];
+  }
+
   async function selectAccount(nextAccountId: string) {
     const res = await AuthApi.selectAccount(nextAccountId);
     persistSession(res);
@@ -154,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         pendingAccountChoice,
         loading,
         login,
+        register,
         selectAccount,
         logout,
       }}

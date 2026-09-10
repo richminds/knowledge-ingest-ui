@@ -12,6 +12,8 @@ import {
   Mail,
   ShieldCheck,
   Sparkles,
+  User,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
@@ -23,10 +25,11 @@ import { Button } from "@/components/ui/button";
 // elevated form card, icon-adorned fields) — rebuilt in Tailwind because this
 // app has no MUI, and pointed at auth-service (see api/authEndpoints.ts).
 //
-// Sign-in only: this console never creates users. Accounts and their
-// application memberships are provisioned in the account-management console;
-// people sign in with what they were given, and pick which application to
-// work under when they belong to more than one.
+// Two things happen here: signing in, and creating a user. APP ACCOUNTS are
+// still provisioned only in the account-management console — what this screen
+// can create is a USER inside the one guest account (see lib/auth.tsx
+// ::register). Either way the session ends on the account-confirmation step
+// before the console opens.
 const FEATURES = [
   {
     icon: Database,
@@ -46,13 +49,25 @@ const FEATURES = [
 ];
 
 export function AuthScreen() {
-  const { login, selectAccount, accounts, pendingAccountChoice } = useAuth();
+  const { login, register, selectAccount, accounts, pendingAccountChoice } = useAuth();
+  // "signin" | "register" — the account picker is a third state, but it is
+  // driven by pendingAccountChoice rather than by this, because it is reached
+  // from both of the others.
+  const [mode, setMode] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [chosenAccount, setChosenAccount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function switchMode(next: "signin" | "register") {
+    // Clear the error, not the credentials: someone who mistypes an email on
+    // sign-up and switches to sign in shouldn't have to retype it.
+    setError(null);
+    setMode(next);
+  }
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -79,6 +94,37 @@ export function AuthScreen() {
       );
       setError(message);
       toast.error("Sign in failed", { description: message });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const available = await register({
+        email: email.trim().toLowerCase(),
+        name: name.trim(),
+        password,
+      });
+      // register() returns a token, so the user is already signed in; the
+      // guest account still gets confirmed on the next step, exactly as it
+      // would for a returning user.
+      if (available.length > 0) {
+        const preselected = available.find((a) => a.selected) ?? available[0];
+        setChosenAccount(preselected.account_id);
+      } else {
+        toast.success("Account created");
+      }
+    } catch (err) {
+      const message = authErrorMessage(
+        err,
+        "Could not create the account — check the auth service is reachable."
+      );
+      setError(message);
+      toast.error("Could not create account", { description: message });
     } finally {
       setSubmitting(false);
     }
@@ -113,14 +159,23 @@ export function AuthScreen() {
           ? "Pick the application to work under"
           : "Confirm the application to work under",
       }
-    : {
-        lead: "Welcome Back to",
-        accent: "Knowledge Ingest",
-        blurb:
-          "Pick up where you left off — upload new documents, inspect what's indexed, and test retrieval end to end.",
-        heading: "Welcome Back",
-        sub: "Sign in to access your ingestion console",
-      };
+    : mode === "register"
+      ? {
+          lead: "Get Started with",
+          accent: "Knowledge Ingest",
+          blurb:
+            "Create an account to upload documents, inspect what's indexed, and test retrieval end to end.",
+          heading: "Create Account",
+          sub: "Set up a guest account to get started",
+        }
+      : {
+          lead: "Welcome Back to",
+          accent: "Knowledge Ingest",
+          blurb:
+            "Pick up where you left off — upload new documents, inspect what's indexed, and test retrieval end to end.",
+          heading: "Welcome Back",
+          sub: "Sign in to access your ingestion console",
+        };
 
   return (
     <div className="relative min-h-full overflow-hidden bg-[linear-gradient(135deg,#312e81_0%,#6366f1_55%,#8b5cf6_100%)]">
@@ -259,7 +314,22 @@ export function AuthScreen() {
                 </Button>
               </form>
             ) : (
-              <form onSubmit={handleSignIn} className="space-y-4">
+              <form
+                onSubmit={mode === "register" ? handleRegister : handleSignIn}
+                className="space-y-4"
+              >
+                {mode === "register" && (
+                  <Field
+                    icon={User}
+                    label="Your Name"
+                    type="text"
+                    placeholder="Ada Lovelace"
+                    value={name}
+                    onChange={setName}
+                    required
+                  />
+                )}
+
                 <Field
                   icon={Mail}
                   label="Email Address"
@@ -291,17 +361,50 @@ export function AuthScreen() {
                   {submitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Signing In…
+                      {mode === "register" ? "Creating…" : "Signing In…"}
+                    </>
+                  ) : mode === "register" ? (
+                    <>
+                      <UserPlus className="h-4 w-4" />
+                      Create User
                     </>
                   ) : (
                     "Sign In"
+                  )}
+                </Button>
+
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-card px-2 text-[11px] text-muted-foreground">or</span>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full text-sm"
+                  disabled={submitting}
+                  onClick={() => switchMode(mode === "register" ? "signin" : "register")}
+                >
+                  {mode === "register" ? (
+                    "I already have an account"
+                  ) : (
+                    <>
+                      <UserPlus className="h-4 w-4" />
+                      Create User
+                    </>
                   )}
                 </Button>
               </form>
             )}
 
             <p className="mt-6 text-center text-xs text-muted-foreground">
-              Accounts are created by your administrator — contact them if you can't sign in.
+              {mode === "register"
+                ? "New users start in the Guest account — an administrator can move you to another one later."
+                : "Signing in gets you the accounts an administrator has given you."}
             </p>
           </div>
         </div>
