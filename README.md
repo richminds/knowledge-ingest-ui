@@ -74,7 +74,6 @@ Then open http://localhost:5174 and sign in.
 |---|---|---|
 | `VITE_API_BASE_URL` | `""` → proxy to `localhost:8090` | knowledge-service base URL |
 | `VITE_AUTH_BASE_URL` | `""` → proxy to `localhost:8100` | auth-service base URL |
-| `VITE_API_KEY` | unset | Static `X-API-Key` for knowledge-service. **Bypasses per-user JWT scoping** — only for a deployment that intentionally treats every request as one shared service principal, never alongside real end-user login. |
 
 ## Endpoints used
 
