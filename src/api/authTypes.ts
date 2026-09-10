@@ -57,12 +57,19 @@ export interface LoginRequest {
 /** The app account self-service sign-ups land in.
  *
  *  A UUID like every account ID, but a DERIVED one (auth-service
- *  features/account_ids.py) rather than a minted one — this console has to
- *  name the account before it has any session to look one up with, so the
- *  value must be knowable ahead of time. auth-service bootstraps the matching
- *  account at startup, so the two cannot drift.
+ *  features/account_ids.py) back when auth-service bootstrapped a guest
+ *  account at startup, which made the value knowable before the account
+ *  existed — this console has to name it from a form with no session.
  *
- *  Overridable for a deployment that routes sign-ups somewhere else. */
+ *  THAT BOOTSTRAP IS GONE. auth-service now seeds only the admin account, and
+ *  accounts registered through POST /auth/accounts get a RANDOM uuid, so this
+ *  literal matches nothing on a current deployment and register 404s. It is
+ *  kept only so an older database still works.
+ *
+ *  Every deployment must therefore set VITE_GUEST_ACCOUNT_ID to the id of the
+ *  account its sign-ups belong to. Vite inlines it at BUILD time, so changing
+ *  it means restarting the dev server or redeploying — setting it in a running
+ *  environment does nothing. */
 export const GUEST_ACCOUNT_ID =
   import.meta.env.VITE_GUEST_ACCOUNT_ID || "1990b268-3b12-50ab-9be3-09970c1bcfc8";
 
