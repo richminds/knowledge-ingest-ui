@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BrainCircuit, LogOut, Moon, Sun } from "lucide-react";
 import { KnowledgeIngest } from "@/pages/KnowledgeIngest";
-import { AuthScreen } from "@/pages/AuthScreen";
+import { AuthScreen, readResetToken } from "@/pages/AuthScreen";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
@@ -18,11 +18,19 @@ function getInitialTheme(): "light" | "dark" {
 export default function App() {
   const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
   const { user, accountId, accounts, pendingAccountChoice, loading, logout } = useAuth();
+  // Read once on mount: AuthScreen strips the parameter after a reset, and
+  // re-reading would flip the screen away mid-flow.
+  const [resetToken] = useState(readResetToken);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
+
+  // Ahead of the session check on purpose — a reset link is often opened by
+  // someone who still has a live session, and dropping them into the console
+  // would strand the link.
+  if (resetToken) return <AuthScreen initialToken={resetToken} />;
 
   if (loading) {
     return (

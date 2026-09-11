@@ -5,8 +5,7 @@ import {
   BrainCircuit,
   Building2,
   Database,
-  Eye,
-  EyeOff,
+  KeyRound,
   Loader2,
   Lock,
   Mail,
@@ -19,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { authErrorMessage } from "@/api/authClient";
 import { Button } from "@/components/ui/button";
+import { Field, RevealButton } from "@/components/ui/field";
+import { ForgotPasswordForm, ResetPasswordForm } from "./passwordResetForms";
 
 // Layout/treatment ported from the makemerich frontend's Login.js (gradient
 // hero, floating circles, split marketing panel with glass feature cards,
@@ -48,12 +49,39 @@ const FEATURES = [
   },
 ];
 
-export function AuthScreen() {
+/** The `token` query parameter from an emailed reset link, if present.
+ *
+ *  This console has no router, so the reset screen is selected by the URL
+ *  rather than navigated to. App.tsx reads this and renders AuthScreen even
+ *  for a signed-in user — someone with a live session is often exactly who is
+ *  resetting a password. */
+export function readResetToken(): string | null {
+  if (typeof window === "undefined") return null;
+  const token = new URLSearchParams(window.location.search).get("token");
+  return token && token.trim() ? token : null;
+}
+
+/** Drop the token from the address bar once it has been redeemed or
+ *  abandoned, so a reload doesn't reopen the reset form holding a token the
+ *  server has since marked used — which would report "already used" for a
+ *  reset that actually worked. replaceState so Back doesn't return to it. */
+function clearResetToken() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete("token");
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+export function AuthScreen({ initialToken = null }: { initialToken?: string | null }) {
   const { login, register, selectAccount, accounts, pendingAccountChoice } = useAuth();
   // "signin" | "register" — the account picker is a third state, but it is
   // driven by pendingAccountChoice rather than by this, because it is reached
   // from both of the others.
-  const [mode, setMode] = useState<"signin" | "register">("signin");
+  const [mode, setMode] = useState<"signin" | "register" | "forgot">("signin");
+  // Set from the emailed link (or, in development, from the token
+  // auth-service hands back when it has no mailer). Non-null means the reset
+  // form replaces every other view.
+  const [resetToken, setResetToken] = useState<string | null>(initialToken);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -62,7 +90,7 @@ export function AuthScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function switchMode(next: "signin" | "register") {
+  function switchMode(next: "signin" | "register" | "forgot") {
     // Clear the error, not the credentials: someone who mistypes an email on
     // sign-up and switches to sign in shouldn't have to retype it.
     setError(null);
@@ -147,7 +175,25 @@ export function AuthScreen() {
   }
 
   const multiple = accounts.length > 1;
-  const copy = pendingAccountChoice
+  const copy = resetToken
+    ? {
+        lead: "Choose a New",
+        accent: "Password",
+        blurb:
+          "Pick a new password for your Knowledge Ingest account. The link that brought you here works once, and only for a short while.",
+        heading: "Choose a New Password",
+        sub: "Set the password you'll sign in with",
+      }
+    : mode === "forgot"
+      ? {
+          lead: "Locked Out of",
+          accent: "Knowledge Ingest",
+          blurb:
+            "Tell us the email you signed up with and we'll send a link to choose a new password.",
+          heading: "Forgot Password?",
+          sub: "We'll email you a reset link",
+        }
+    : pendingAccountChoice
     ? {
         lead: "Choose Your",
         accent: "Account",
@@ -233,7 +279,27 @@ export function AuthScreen() {
               </div>
             )}
 
-            {pendingAccountChoice ? (
+            {resetToken ? (
+              <ResetPasswordForm
+                token={resetToken}
+                setError={setError}
+                onDone={() => {
+                  clearResetToken();
+                  setResetToken(null);
+                  setError(null);
+                  setMode("signin");
+                }}
+              />
+            ) : mode === "forgot" ? (
+              <ForgotPasswordForm
+                setError={setError}
+                onBack={() => switchMode("signin")}
+                onHasToken={(t) => {
+                  setError(null);
+                  setResetToken(t);
+                }}
+              />
+            ) : pendingAccountChoice ? (
               <form onSubmit={handleChooseAccount} className="space-y-4">
                 <div>
                   <label className="mb-1.5 block pl-0.5 text-xs font-medium text-muted-foreground">
@@ -357,6 +423,19 @@ export function AuthScreen() {
                   }
                 />
 
+                {mode === "signin" && (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => switchMode("forgot")}
+                      className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary transition-colors hover:underline"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" />
+                      Forgot password?
+                    </button>
+                  </div>
+                )}
+
                 <Button type="submit" className="h-11 w-full text-sm" disabled={submitting}>
                   {submitting ? (
                     <>
@@ -402,9 +481,13 @@ export function AuthScreen() {
             )}
 
             <p className="mt-6 text-center text-xs text-muted-foreground">
-              {mode === "register"
-                ? "New users start in the Guest account — an administrator can move you to another one later."
-                : "Signing in gets you the accounts an administrator has given you."}
+              {resetToken
+                ? "This link works once. Request another if it has expired."
+                : mode === "forgot"
+                  ? "For security we send the same confirmation whether or not the address is registered."
+                  : mode === "register"
+                    ? "New users start in the Guest account — an administrator can move you to another one later."
+                    : "Signing in gets you the accounts an administrator has given you."}
             </p>
           </div>
         </div>
@@ -413,56 +496,3 @@ export function AuthScreen() {
   );
 }
 
-
-function RevealButton({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="text-muted-foreground transition-colors hover:text-foreground"
-      aria-label={shown ? "Hide password" : "Show password"}
-    >
-      {shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-    </button>
-  );
-}
-
-function Field({
-  icon: Icon,
-  label,
-  value,
-  onChange,
-  trailing,
-  className,
-  ...props
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  trailing?: React.ReactNode;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
-  return (
-    <div>
-      <label className="mb-1.5 block pl-0.5 text-xs font-medium text-muted-foreground">
-        {label}
-      </label>
-      <div className="relative">
-        <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={cn(
-            "h-11 w-full rounded-lg border border-border bg-background pl-10 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            trailing ? "pr-10" : "pr-3",
-            className
-          )}
-          {...props}
-        />
-        {trailing && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">{trailing}</div>
-        )}
-      </div>
-    </div>
-  );
-}

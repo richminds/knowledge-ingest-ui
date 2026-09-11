@@ -93,3 +93,38 @@ export interface SelectAccountRequest {
 export interface AuthApiErrorBody {
   error?: { code?: string; message?: string };
 }
+
+
+// ───────────────────────────────────────────────────────── password reset
+
+/** POST /auth/forgot-password.
+ *
+ *  `account_id` is REQUIRED. auth-service keys users on (email, account_id)
+ *  with a password hash per record, so an address alone doesn't identify the
+ *  password being reset. This console always sends GUEST_ACCOUNT_ID — the same
+ *  account it registers sign-ups into — so a reset started here only ever
+ *  touches that record, never the same person's record in another
+ *  application. */
+export interface ForgotPasswordRequest {
+  email: string;
+  account_id: string;
+}
+
+export interface ForgotPasswordResponse {
+  /** Identical whether or not the address is registered. The endpoint must not
+   *  be usable to enumerate addresses, so the UI shows this same confirmation
+   *  either way and never reports "no such user". */
+  message: string;
+  /** Development only: the raw token, present when auth-service has no SMTP
+   *  configured AND AUTH_EXPOSE_RESET_TOKEN is on. Never set in production. */
+  debug_token?: string | null;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  new_password: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}

@@ -8,6 +8,10 @@
     {
       "source": "/v1/:path*",
       "destination": "https://api-gateway-two-nu.vercel.app/api/knowledge/v1/:path*"
+    },
+    {
+      "source": "/((?!auth/|v1/).*)",
+      "destination": "/index.html"
     }
   ]
 }

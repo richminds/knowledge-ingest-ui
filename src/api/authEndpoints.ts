@@ -1,5 +1,13 @@
 import { authApi } from "./authClient";
-import type { AuthUser, LoginRequest, RegisterRequest, TokenResponse } from "./authTypes";
+import { GUEST_ACCOUNT_ID } from "./authTypes";
+import type {
+  AuthUser,
+  ForgotPasswordResponse,
+  LoginRequest,
+  RegisterRequest,
+  ResetPasswordResponse,
+  TokenResponse,
+} from "./authTypes";
 
 // Sign-in, plus self-service sign-up into the guest account. APP ACCOUNTS are
 // still provisioned only in the account-management console (auth-service
@@ -20,6 +28,30 @@ export const AuthApi = {
     authApi.post<TokenResponse>("/auth/me/account", { account_id: accountId }).then((r) => r.data),
   me: () => authApi.get<AuthUser>("/auth/me").then((r) => r.data),
   logout: () => authApi.post<void>("/auth/logout").then(() => undefined),
+
+  // Password reset. Both endpoints are public (the gateway lists them in
+  // GATEWAY_PUBLIC_PATHS) — a user who can't sign in obviously can't present a
+  // token to ask for help signing in.
+  //
+  // Pinned to GUEST_ACCOUNT_ID for the same reason register() is: it names the
+  // application whose password is being reset.
+  forgotPassword: (email: string) =>
+    authApi
+      .post<ForgotPasswordResponse>("/auth/forgot-password", {
+        email,
+        account_id: GUEST_ACCOUNT_ID,
+      })
+      .then((r) => r.data),
+
+  // 400 if the link is unknown, already used, or expired — the message
+  // distinguishes them.
+  resetPassword: (token: string, newPassword: string) =>
+    authApi
+      .post<ResetPasswordResponse>("/auth/reset-password", {
+        token,
+        new_password: newPassword,
+      })
+      .then((r) => r.data),
 };
 
 // Account administration (list, create, rename, delete) lives in
