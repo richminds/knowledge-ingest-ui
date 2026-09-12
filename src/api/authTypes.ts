@@ -56,22 +56,28 @@ export interface LoginRequest {
 
 /** The app account self-service sign-ups land in.
  *
- *  A UUID like every account ID, but a DERIVED one (auth-service
- *  features/account_ids.py) back when auth-service bootstrapped a guest
- *  account at startup, which made the value knowable before the account
- *  existed — this console has to name it from a form with no session.
+ *  CONFIGURED, NOT COMPILED IN. The value lives in this console's .env and
+ *  nowhere else: auth-service mints account IDs when an account is registered
+ *  (POST /auth/accounts), so the guest account's ID differs per deployment and
+ *  no built-in default could be right. Copy it out of the account-management
+ *  console. Vite inlines it at BUILD time, so changing it means restarting the
+ *  dev server or redeploying — setting it in a running environment does
+ *  nothing.
  *
- *  THAT BOOTSTRAP IS GONE. auth-service now seeds only the admin account, and
- *  accounts registered through POST /auth/accounts get a RANDOM uuid, so this
- *  literal matches nothing on a current deployment and register 404s. It is
- *  kept only so an older database still works.
- *
- *  Every deployment must therefore set VITE_GUEST_ACCOUNT_ID to the id of the
- *  account its sign-ups belong to. Vite inlines it at BUILD time, so changing
- *  it means restarting the dev server or redeploying — setting it in a running
- *  environment does nothing. */
-export const GUEST_ACCOUNT_ID =
-  import.meta.env.VITE_GUEST_ACCOUNT_ID || "1990b268-3b12-50ab-9be3-09970c1bcfc8";
+ *  Refuses to boot unconfigured rather than degrade quietly. /auth/register
+ *  accepts a MISSING account_id and creates a user tied to no application, so
+ *  an unset value would not fail — every sign-up from this form would land
+ *  nowhere — and /auth/forgot-password, where the field is required, would
+ *  422. A blank screen in front of whoever deployed it is the better outcome. */
+const configuredGuestAccountId: string = (import.meta.env.VITE_GUEST_ACCOUNT_ID ?? "").trim();
+if (!configuredGuestAccountId) {
+  throw new Error(
+    "VITE_GUEST_ACCOUNT_ID is not set. It names the auth-service app account this " +
+      "console registers sign-ups into; set it in .env (copy .env.example) to the " +
+      "account_id shown in the account-management console.",
+  );
+}
+export const GUEST_ACCOUNT_ID: string = configuredGuestAccountId;
 
 // POST /auth/register — public, unlike account administration. `account_id`
 // names the app account the new user belongs to; auth-service 404s if it
