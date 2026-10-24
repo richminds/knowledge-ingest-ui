@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../knowledge-service"
+		},
+		{
+			"path": "../../RouteToRich/makemerich-backend"
+		},
+		{
+			"path": "../../RouteToRich/makemerich-frontend"
+		}
+	]
+}
