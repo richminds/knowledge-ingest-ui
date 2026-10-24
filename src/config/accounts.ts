@@ -13,8 +13,15 @@
  * account-management console. CONFIGURED, NOT COMPILED IN: it lives in .env
  * locally and in the deployment's environment (Vite inlines it at BUILD time,
  * so changing it means restarting the dev server or redeploying).
+ *
+ * VITE_GUEST_ACCOUNT_ID is the name this console used before (sign-ups were
+ * pinned to the guest account); deployments that still set it keep working.
  */
-export const KNOWLEDGE_ACCOUNT_ID: string = (import.meta.env.VITE_KNOWLEDGE_ACCOUNT_ID ?? "").trim();
+export const KNOWLEDGE_ACCOUNT_ID: string = (
+  import.meta.env.VITE_KNOWLEDGE_ACCOUNT_ID ||
+  import.meta.env.VITE_GUEST_ACCOUNT_ID ||
+  ""
+).trim();
 
 /**
  * Refuse to boot unconfigured rather than degrade quietly. auth-service skips
@@ -25,7 +32,7 @@ export const KNOWLEDGE_ACCOUNT_ID: string = (import.meta.env.VITE_KNOWLEDGE_ACCO
  */
 if (!KNOWLEDGE_ACCOUNT_ID) {
   throw new Error(
-    "VITE_KNOWLEDGE_ACCOUNT_ID is not set. It names the auth-service app account this " +
+    "VITE_KNOWLEDGE_ACCOUNT_ID (or VITE_GUEST_ACCOUNT_ID) is not set. It names the auth-service app account this " +
       "console signs in under; set it in .env (copy .env.example) to the account_id " +
       "shown in the account-management console."
   );
