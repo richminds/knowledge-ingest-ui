@@ -1,35 +1,36 @@
 import axios from "axios";
-import { TOKEN_KEY } from "./authClient";
 
-// This console talks directly to a knowledge-service instance (no gateway/BFF
-// in front). Empty baseURL means relative /v1/... requests, which the Vite
-// dev proxy forwards to http://localhost:8090 (see vite.config.ts); set
-// VITE_API_BASE_URL to point at a deployed instance instead.
+// This console talks directly to the wbg-oissaagent-knowledge RAG API
+// (FastAPI, routes under /api/v1). Empty baseURL means relative /api/v1/...
+// requests, which the Vite dev proxy forwards to http://localhost:8000 (see
+// vite.config.ts); set VITE_API_BASE_URL to point at a deployed instance
+// instead — that instance must then list this app's origin in
+// CORS_ALLOW_ORIGINS.
 const baseURL = import.meta.env.VITE_API_BASE_URL || "";
+
+// The RAG service's AUTH_MODE decides what it accepts:
+//   none     — local dev; no credential, ACLs not enforced
+//   api_key  — a shared X-API-Key; the caller gets API_KEY_PRINCIPALS
+// There is no user sign-in here, so for api_key deployments the key below is
+// the only credential. It is inlined into the bundle at build time — anyone
+// who can load the page can read it, so only use it for internal consoles.
+const apiKey = import.meta.env.VITE_RAG_API_KEY || "";
 
 export const api = axios.create({
   baseURL,
-  // RAG queries (embed -> hybrid search -> rerank -> LLM generate) can
-  // legitimately run well past 15s, so give every request up to 2 minutes
-  // rather than aborting client-side.
+  // RAG answers (query analysis -> retrieve -> rerank -> generate -> judge),
+  // and synchronous uploads of large documents, can legitimately run well
+  // past 15s, so give every request up to 2 minutes rather than aborting
+  // client-side.
   timeout: 120000,
+  headers: apiKey ? { "X-API-Key": apiKey } : undefined,
 });
 
-// The signed-in user's auth-service access token (see lib/auth.tsx), sent as a
-// Bearer JWT. It is the ONLY credential this app sends: the API gateway
-// verifies it and routes the request, and knowledge-service derives
-// account_id/user_id from its claims rather than trusting the request body —
-// which is what makes account-scoped requests (query/upload/files) actually
-// enforce tenant isolation instead of taking the caller's word for it.
-//
-// A static VITE_API_KEY used to be sent as X-API-Key alongside this. It is
-// gone: knowledge-service no longer accepts one, and it had defeated exactly
-// the isolation described above by winning over the JWT.
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// FastAPI errors come back as {"detail": "..."} (or a list of validation
+// errors for 422s); surface that rather than axios's generic message.
+export function errorMessage(err: unknown, fallback: string): string {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg);
+  return fallback;
+}
