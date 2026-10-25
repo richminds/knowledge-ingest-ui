@@ -46,7 +46,7 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "destructive" | "se
 export function KnowledgeIngest() {
   const [collection, setCollection] = useState("default");
   const [collectionDraft, setCollectionDraft] = useState("default");
-  const [graph, setGraph] = useState(false);
+  const [graph, setGraph] = useState(true);
   const [files, setFiles] = useState<File[]>([]);
   const [results, setResults] = useState<UploadResult[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
